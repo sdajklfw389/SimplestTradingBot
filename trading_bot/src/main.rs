@@ -83,6 +83,8 @@ async fn place_sell_order(api_key: &str, secret_key: &str, symbol: &str, quantit
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = reqwest::Client::new();
+
+    let url_account_info = "https://testnet.binance.vision/api/v3/account";
     
     let url = "https://testnet.binance.vision/api/v3/ticker/price?symbol=ETHUSDT";
 
@@ -94,7 +96,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
         if eth_price > 1830.0
         {
-            println!("ETH to USD price exceeds 2500, sell");
+            println!("ETH to USD price exceeds 1830, sell");
     
             let pub_key_file = "../test-pub-key.pem";
             let prv_key_file = "../test-prv-key.pem";
@@ -105,7 +107,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
             match fs::read_to_string(pub_key_file) {
                 Ok(pub_key_content) => {
-                    println!("File content:\n{}", pub_key_content);
+                    println!("Read success\n");
                 }
                 Err(error) => {
                     eprintln!("Error reading file: {}", error);
@@ -114,7 +116,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
             match fs::read_to_string(prv_key_file) {
                 Ok(prv_key_content) => {
-                    println!("File content:\n{}", prv_key_content);
+                    println!("Read success\n");
                 }
                 Err(error) => {
                     eprintln!("Error reading file: {}", error);
