@@ -5,7 +5,8 @@ use std::fs;
 use sha2::Sha256;
 use hmac::{Hmac, Mac};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
+#[allow(dead_code)]
 struct OrderResponse {
     symbol: String,
     order_id: u64,
@@ -26,7 +27,7 @@ struct TickerResponse {
     price: String,
 }
 
-async fn place_sell_order(api_key: &str, secret_key: &str, symbol: &str, quantity: &str) -> Result<OrderResponse, reqwest::Error> {
+async fn place_sell_order(api_key: &str, secret_key: &str, symbol: &str, quantity: &str) -> Result<OrderResponse, Box<dyn std::error::Error>> {
     let timestamp = chrono::Utc::now().timestamp_millis();
     let base_url = "https://testnet.binance.vision/api/v3";
     let endpoint = "/order";
@@ -73,11 +74,18 @@ async fn place_sell_order(api_key: &str, secret_key: &str, symbol: &str, quantit
         .query(&[("timestamp", &timestamp.to_string())])
         .query(&[("signature", &hex::encode(signature.into_bytes()))])
         .send()
-        .await?
-        .json::<OrderResponse>()
         .await?;
-    
-    Ok(response)
+
+    // Read the response text
+    let text = response.text().await?;
+
+    // Print the response text
+    println!("{}", text);
+
+    // Parse the text as JSON
+    let order_response: OrderResponse = serde_json::from_str(&text)?;
+
+    Ok(order_response)
 }
 
 #[tokio::main]
