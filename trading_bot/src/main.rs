@@ -65,14 +65,18 @@ async fn place_sell_order(api_key: &str, secret_key: &str, symbol: &str, quantit
 
     // Build the request
     let client = reqwest::Client::new();
+    let url = format!("{}?symbol={}&side={}&type={}&quantity={}&timestamp={}&signature={}",
+        "https://testnet.binance.vision/api/v3/order",
+        symbol,
+        "SELL",
+        "MARKET",
+        quantity,
+        timestamp,
+        hex::encode(&(signature.into_bytes()))
+    );
+
     let response = client.post(&url)
         .headers(headers)
-        .query(&[("symbol", symbol)])
-        .query(&[("side", "SELL")])
-        .query(&[("type", "MARKET")])
-        .query(&[("quantity", quantity)])
-        .query(&[("timestamp", &timestamp.to_string())])
-        .query(&[("signature", &hex::encode(signature.into_bytes()))])
         .send()
         .await?;
 
