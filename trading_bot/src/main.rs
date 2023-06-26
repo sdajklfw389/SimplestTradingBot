@@ -106,15 +106,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         {
             println!("ETH to USD price exceeds 1830, sell");
     
-            let pub_key_file = "../test-pub-key.pem";
+            let api_key_file = "./APIKey.pem";
             let prv_key_file = "../test-prv-key.pem";
-            let pub_key_content = "";
-            let prv_key_content = "";
+            let mut api_key_content = String::new();
+            let mut prv_key_content = String::new();
             let symbol = "ETHUSD";
             let quantity = "1.5";
     
-            match fs::read_to_string(pub_key_file) {
-                Ok(pub_key_content) => {
+            match fs::read_to_string(api_key_file) {
+                Ok(content) => {
+                    api_key_content = content;
                     println!("Read success\n");
                 }
                 Err(error) => {
@@ -123,7 +124,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
     
             match fs::read_to_string(prv_key_file) {
-                Ok(prv_key_content) => {
+                Ok(content) => {
+                    prv_key_content = content;
                     println!("Read success\n");
                 }
                 Err(error) => {
@@ -131,7 +133,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         
-            let response = place_sell_order(pub_key_content, prv_key_content, symbol, quantity).await;
+            let response = place_sell_order(api_key_content.as_str(), prv_key_content.as_str(), symbol, quantity).await;
             match response {
                 Ok(order) => println!("Sell order placed successfully. Order ID: {}", order.order_id),
                 Err(e) => eprintln!("Error placing sell order: {}", e),
