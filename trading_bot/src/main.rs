@@ -2,8 +2,8 @@ use reqwest::header::{HeaderMap, HeaderValue};
 use std::collections::HashMap;
 use serde::Deserialize;
 use std::fs;
-use sha2::Sha256;
-use hmac::{Hmac, Mac};
+use rsa::{RsaPrivateKey, pkcs8::DecodePrivateKey, Pkcs1v15Sign};
+use sha2::{Sha256, Digest};
 
 #[derive(Deserialize, Debug)]
 #[allow(dead_code)]
@@ -29,16 +29,15 @@ struct TickerResponse {
 
 async fn place_sell_order(api_key: &str, secret_key: &str, symbol: &str, quantity: &str) -> Result<OrderResponse, Box<dyn std::error::Error>> {
     let timestamp = chrono::Utc::now().timestamp_millis();
-    let base_url = "https://testnet.binance.vision/api/v3";
-    let endpoint = "/order";
-    let url = format!("{}{}", base_url, endpoint);
+    // let base_url = "https://testnet.binance.vision/api/v3";
+    // let endpoint = "/order";
 
     // Create the query parameters for the sell order
     let mut query_params: HashMap<&str, String> = HashMap::new();
-    query_params.insert("symbol", symbol.to_string());
-    query_params.insert("side", "SELL".to_string());
-    query_params.insert("type", "MARKET".to_string());
-    query_params.insert("quantity", quantity.to_string());
+    // query_params.insert("symbol", symbol.to_string());
+    // query_params.insert("side", "SELL".to_string());
+    // query_params.insert("type", "MARKET".to_string());
+    // query_params.insert("quantity", quantity.to_string());
     query_params.insert("timestamp", timestamp.to_string());
 
     // Generate the query string
@@ -47,35 +46,38 @@ async fn place_sell_order(api_key: &str, secret_key: &str, symbol: &str, quantit
         .collect::<Vec<String>>()
         .join("&");
 
-    // Create the HMAC SHA256 signature
-    // Create alias for HMAC-SHA256
-    type HmacSha256 = Hmac<Sha256>;
+    let private_key = RsaPrivateKey::from_pkcs8_pem(&secret_key).expect("invalid pem");
+    // First step: create a SHA-256 hash of the message.
+    let mut hasher = Sha256::new();
+    hasher.update(query_string);
+    let hashed_message = hasher.finalize();
 
-    let mut mac = HmacSha256::new_from_slice(secret_key.as_bytes())
-        .expect("HMAC can take key of any size");
-    mac.update(query_string.as_bytes());
+    // Sign the hashed message.
+    let padding = Pkcs1v15Sign::new::<rsa::sha2::Sha256>();
+    let signature = private_key.sign(padding, &hashed_message).expect("failed to encrypt");
 
-    // `result` has type `CtOutput` which is a thin wrapper around array of
-    // bytes for providing constant time equality check
-    let signature = mac.finalize();
-    
     // Create the request headers
     let mut headers = HeaderMap::new();
     headers.insert("X-MBX-APIKEY", HeaderValue::from_str(api_key).unwrap());
 
     // Build the request
     let client = reqwest::Client::new();
-    let url = format!("{}?symbol={}&side={}&type={}&quantity={}&timestamp={}&signature={}",
-        "https://testnet.binance.vision/api/v3/order",
-        symbol,
-        "SELL",
-        "MARKET",
-        quantity,
+    // let url = format!("{}?symbol={}&side={}&type={}&quantity={}&timestamp={}&signature={}",
+    //     "https://testnet.binance.vision/api/v3/order",
+    //     symbol,
+    //     "SELL",
+    //     "MARKET",
+    //     quantity,
+    //     timestamp,
+    //     hex::encode(&(signature.into_bytes()))
+    // );
+    let url = format!("{}?timestamp={}&signature={}",
+        "https://testnet.binance.vision/api/v3/account",
         timestamp,
-        hex::encode(&(signature.into_bytes()))
+        hex::encode(&signature)
     );
 
-    let response = client.post(&url)
+    let response = client.get(&url)
         .headers(headers)
         .send()
         .await?;
