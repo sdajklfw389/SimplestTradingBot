@@ -4,6 +4,7 @@ use serde::Deserialize;
 use std::fs;
 use rsa::{RsaPrivateKey, pkcs8::DecodePrivateKey, Pkcs1v15Sign};
 use sha2::{Sha256, Digest};
+use base64; 
 
 #[derive(Deserialize, Debug)]
 #[allow(dead_code)]
@@ -29,15 +30,9 @@ struct TickerResponse {
 
 async fn place_sell_order(api_key: &str, secret_key: &str, symbol: &str, quantity: &str) -> Result<OrderResponse, Box<dyn std::error::Error>> {
     let timestamp = chrono::Utc::now().timestamp_millis();
-    // let base_url = "https://testnet.binance.vision/api/v3";
-    // let endpoint = "/order";
 
     // Create the query parameters for the sell order
     let mut query_params: HashMap<&str, String> = HashMap::new();
-    // query_params.insert("symbol", symbol.to_string());
-    // query_params.insert("side", "SELL".to_string());
-    // query_params.insert("type", "MARKET".to_string());
-    // query_params.insert("quantity", quantity.to_string());
     query_params.insert("timestamp", timestamp.to_string());
 
     // Generate the query string
@@ -46,13 +41,13 @@ async fn place_sell_order(api_key: &str, secret_key: &str, symbol: &str, quantit
         .collect::<Vec<String>>()
         .join("&");
 
-    let private_key = RsaPrivateKey::from_pkcs8_pem(&secret_key).expect("invalid pem");
     // First step: create a SHA-256 hash of the message.
     let mut hasher = Sha256::new();
     hasher.update(query_string);
     let hashed_message = hasher.finalize();
 
     // Sign the hashed message.
+    let private_key = RsaPrivateKey::from_pkcs8_pem(&secret_key).expect("invalid pem");
     let padding = Pkcs1v15Sign::new::<rsa::sha2::Sha256>();
     let signature = private_key.sign(padding, &hashed_message).expect("failed to encrypt");
 
@@ -62,19 +57,10 @@ async fn place_sell_order(api_key: &str, secret_key: &str, symbol: &str, quantit
 
     // Build the request
     let client = reqwest::Client::new();
-    // let url = format!("{}?symbol={}&side={}&type={}&quantity={}&timestamp={}&signature={}",
-    //     "https://testnet.binance.vision/api/v3/order",
-    //     symbol,
-    //     "SELL",
-    //     "MARKET",
-    //     quantity,
-    //     timestamp,
-    //     hex::encode(&(signature.into_bytes()))
-    // );
     let url = format!("{}?timestamp={}&signature={}",
         "https://testnet.binance.vision/api/v3/account",
         timestamp,
-        hex::encode(&signature)
+        base64::encode(&signature)
     );
 
     let response = client.get(&url)
