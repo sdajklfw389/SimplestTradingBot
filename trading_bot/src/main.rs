@@ -28,7 +28,23 @@ struct TickerResponse {
     price: String,
 }
 
-async fn place_sell_order(api_key: &str, secret_key: &str, symbol: &str, quantity: &str) -> Result<OrderResponse, Box<dyn std::error::Error>> {
+struct Name
+{
+    Name(base_url: &str);
+
+    join_query_parameters();
+    place_order();
+    
+    str api_key;
+    str pri_key;
+    str base_url = "https://testnet.binance.vision/api/v3";
+}
+
+/*
+* ret: query_string: joined parameters + '&' + timestamp
+*/
+(str, str) join_query_parameters(url_path: &str, parameters: &HashMap<&str, String>)
+{
     let timestamp = chrono::Utc::now().timestamp_millis();
 
     // Create the query parameters for the sell order
@@ -36,11 +52,15 @@ async fn place_sell_order(api_key: &str, secret_key: &str, symbol: &str, quantit
     query_params.insert("timestamp", timestamp.to_string());
 
     // Generate the query string
-    let query_string = query_params.iter()
+    let query_string = parameters.iter()
         .map(|(k, v)| format!("{}={}", k, v))
         .collect::<Vec<String>>()
         .join("&");
+}
 
+async fn place_order(method: &str, url_path: &str, query_string: &str, parameters: &HashMap<&str, String>) -> Result<OrderResponse, Box<dyn std::error::Error>> {
+    
+    let (url, query_string) = join_query_parameters(url_path, parameters);
     // First step: create a SHA-256 hash of the message.
     let mut hasher = Sha256::new();
     hasher.update(query_string);
@@ -57,11 +77,14 @@ async fn place_sell_order(api_key: &str, secret_key: &str, symbol: &str, quantit
 
     // Build the request
     let client = reqwest::Client::new();
-    let url = format!("{}?timestamp={}&signature={}",
-        "https://testnet.binance.vision/api/v3/account",
-        timestamp,
-        base64::encode(&signature)
-    );
+    // This is just retrieve testnet account info
+    // let url = format!("{}?timestamp={}&signature={}",
+    //     "https://testnet.binance.vision/api/v3/account",
+    //     timestamp,
+    //     base64::encode(&signature)
+    // );
+
+    let url = base_url + url_path + query_string + signature;
 
     let response = client.get(&url)
         .headers(headers)
@@ -94,7 +117,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let eth_price = response.price.parse::<f32>().unwrap();
         println!("eth price is : {}", eth_price);
     
-        if eth_price > 1830.0
+        if eth_price > 1650.0
         {
             println!("ETH to USD price exceeds 1830, sell");
     
@@ -125,7 +148,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         
-            let response = place_sell_order(api_key_content.as_str(), prv_key_content.as_str(), symbol, quantity).await;
+            let response = place_order(api_key_content.as_str(), prv_key_content.as_str(), url, query_string).await;
             match response {
                 Ok(order) => println!("Sell order placed successfully. Order ID: {}", order.order_id),
                 Err(e) => eprintln!("Error placing sell order: {}", e),
