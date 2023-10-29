@@ -1,5 +1,5 @@
 use reqwest::header::{HeaderMap, HeaderValue};
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 use serde::Deserialize;
 use std::fs;
 use rsa::{RsaPrivateKey, pkcs8::DecodePrivateKey, Pkcs1v15Sign};
@@ -30,7 +30,7 @@ struct TickerResponse {
 
 static mut APIKEY: String = String::new();
 static mut PRVKEY: String = String::new();
-static BASEURL: &'static str = "https://testnet.binance.vision/api/v3/account";
+static BASEURL: &'static str = "https://testnet.binance.vision/";
 
 fn initialize()
 {
@@ -63,19 +63,14 @@ fn initialize()
 }
 
 
-async fn place_order() -> Result<OrderResponse, Box<dyn std::error::Error>> { 
-    let timestamp = chrono::Utc::now().timestamp_millis();
-
-    // Create the query parameters for the sell order
-    let mut query_params: HashMap<&str, String> = HashMap::new();
-    query_params.insert("timestamp", timestamp.to_string());
-
+async fn place_order(query_params: &mut HashMap<&str, &str>) -> Result<OrderResponse, Box<dyn std::error::Error>> {
     // Generate the query string
-    let query_string = query_params.iter()
+    let query_string: String = query_params.iter()
         .map(|(k, v)| format!("{}={}", k, v))
         .collect::<Vec<String>>()
         .join("&");
 
+    let query_string_clone = query_string.clone();
     // First step: create a SHA-256 hash of the message.
     let mut hasher = Sha256::new();
     hasher.update(query_string);
@@ -94,12 +89,14 @@ async fn place_order() -> Result<OrderResponse, Box<dyn std::error::Error>> {
 
     // Build the request
     let client = reqwest::Client::new();
-    // This is just retrieve testnet account info
-    let url = format!("{}?timestamp={}&signature={}",
-        BASEURL,
-        timestamp,
-        base64::encode(&signature)
-    );
+
+    // Build url
+    let mut url: String = String::from(BASEURL);
+    // String::from_str("/api/v3/order/") + query_string + String::from_str("/") + base64::encode(&signature)
+    url.push_str("/api/v3/order/");
+    url.push_str(&query_string_clone);
+    url.push_str("&signature=");
+    url.push_str(&base64::encode(&signature));
 
     let response = client.get(&url)
         .headers(headers)
@@ -132,17 +129,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let response: TickerResponse = client.get(url).send().await?.json::<TickerResponse>().await?;
         let eth_price = response.price.parse::<f32>().unwrap();
-        println!("eth price is : {}", eth_price);
     
-        if eth_price > 1650.0
+        if eth_price > 1000.0
         {
-            println!("ETH to USD price exceeds 1830, sell");
+            println!("ETH to USD price exceeds 1900, sell");
     
-            let symbol = "ETHUSD";
-            let quantity = "1.5";
-    
+            // Create the query parameters for the sell order
+            let mut query_params: HashMap<&str, &str> = HashMap::new();
+            query_params.insert("symbol", "ETHUSDT");
+            query_params.insert("side", "sell");
+            query_params.insert("type", "LIMIT");
+            query_params.insert("quantity", "0.5");
+            let timestamp = chrono::Utc::now().timestamp_millis().to_string();
+            query_params.insert("timestamp", timestamp.as_str());
         
-            let response = place_order().await;
+            let response = place_order(&mut query_params).await;
             match response {
                 Ok(order) => println!("Sell order placed successfully. Order ID: {}", order.order_id),
                 Err(e) => eprintln!("Error placing sell order: {}", e),
