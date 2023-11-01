@@ -65,10 +65,14 @@ fn initialize()
 
 async fn place_order(query_params: &mut HashMap<&str, &str>) -> Result<OrderResponse, Box<dyn std::error::Error>> {
     // Generate the query string
-    let query_string: String = query_params.iter()
+    let mut query_string: String = query_params.iter()
         .map(|(k, v)| format!("{}={}", k, v))
         .collect::<Vec<String>>()
         .join("&");
+
+    let timestamp = chrono::Utc::now().timestamp_millis().to_string();
+    query_string.push_str("&timestamp=");
+    query_string.push_str(timestamp.as_str());
 
     let query_string_clone = query_string.clone();
     // First step: create a SHA-256 hash of the message.
@@ -98,7 +102,7 @@ async fn place_order(query_params: &mut HashMap<&str, &str>) -> Result<OrderResp
     url.push_str("&signature=");
     url.push_str(&base64::encode(&signature));
 
-    let response = client.get(&url)
+    let response = client.post(&url)
         .headers(headers)
         .send()
         .await?;
@@ -125,31 +129,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     let url = "https://testnet.binance.vision/api/v3/ticker/price?symbol=ETHUSDT";
 
-    loop
+
+    let response: TickerResponse = client.get(url).send().await?.json::<TickerResponse>().await?;
+    let eth_price = response.price.parse::<f32>().unwrap();
+
+    if eth_price > 1000.0
     {
-        let response: TickerResponse = client.get(url).send().await?.json::<TickerResponse>().await?;
-        let eth_price = response.price.parse::<f32>().unwrap();
+        println!("ETH to USD price exceeds 1900, sell");
+
+        // Create the query parameters for the sell order
+        let mut query_params: HashMap<&str, &str> = HashMap::new();
+        query_params.insert("symbol", "ETHUSDT");
+        query_params.insert("side", "sell");
+        query_params.insert("type", "LIMIT");
+        query_params.insert("quantity", "0.5");
     
-        if eth_price > 1000.0
-        {
-            println!("ETH to USD price exceeds 1900, sell");
-    
-            // Create the query parameters for the sell order
-            let mut query_params: HashMap<&str, &str> = HashMap::new();
-            query_params.insert("symbol", "ETHUSDT");
-            query_params.insert("side", "sell");
-            query_params.insert("type", "LIMIT");
-            query_params.insert("quantity", "0.5");
-            let timestamp = chrono::Utc::now().timestamp_millis().to_string();
-            query_params.insert("timestamp", timestamp.as_str());
-        
-            let response = place_order(&mut query_params).await;
-            match response {
-                Ok(order) => println!("Sell order placed successfully. Order ID: {}", order.order_id),
-                Err(e) => eprintln!("Error placing sell order: {}", e),
-            }
+        let response = place_order(&mut query_params).await;
+        match response {
+            Ok(order) => println!("Sell order placed successfully. Order ID: {}", order.order_id),
+            Err(e) => eprintln!("Error placing sell order: {}", e),
         }
-    
-        println!("Current ETH price: {}", eth_price);
     }
+
+    println!("Current ETH price: {}", eth_price);
+
+    return Ok(());
 }

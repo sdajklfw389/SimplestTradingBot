@@ -22,4 +22,4 @@ signature=$(echo -n "$api_params_with_timestamp" \
 #     --data-urlencode "signature=$signature"
 
 curl -v -H "X-MBX-APIKEY: $API_KEY_CONTENT" -X "$API_METHOD" \
-    "https://testnet.binance.vision/$API_CALL?$api_params_with_timestamp&signature=$signature"
+    "https://testnet.binance.vision/$API_CALL?$api_params_with_timestamp&signature=$signature" -o output.txt
